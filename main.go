@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-    handler := dns.HandlerFunc(ServeDNS)
+	handler := dns.HandlerFunc(ServeDNS)
 	err := dns.ListenAndServe("127.0.0.1:8053", "udp", handler)
 
 	if err != nil {
@@ -15,16 +15,16 @@ func main() {
 }
 
 func ServeDNS(writer dns.ResponseWriter, m *dns.Msg) {
-    response, err := resolveDomain(m)
+	response, err := resolveDomain(m)
 
-    if err != nil {
-        fmt.Println(err)
-        m.MsgHdr.Response = true
-        m.MsgHdr.Rcode = 2
-        writer.WriteMsg(response)
-    } else {
-        writer.WriteMsg(response)
-    }
+	if err != nil {
+		fmt.Println(err)
+		m.MsgHdr.Response = true
+		m.MsgHdr.Rcode = 2
+		writer.WriteMsg(response)
+	} else {
+		writer.WriteMsg(response)
+	}
 }
 
 func resolveDomain(m *dns.Msg) (*dns.Msg, error) {
@@ -47,4 +47,3 @@ func resolveDomain(m *dns.Msg) (*dns.Msg, error) {
 
 	return nil, fmt.Errorf("error resolving question %q", m.Question[0])
 }
-
