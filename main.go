@@ -6,20 +6,38 @@ import (
 )
 
 func main() {
+    handler := dns.HandlerFunc(ServeDNS)
+	err := dns.ListenAndServe("127.0.0.1:8053", "udp", handler)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func ServeDNS(writer dns.ResponseWriter, m *dns.Msg) {
+    response, err := resolveDomain(m)
+
+    if err != nil {
+        fmt.Println(err)
+        m.MsgHdr.Response = true
+        m.MsgHdr.Rcode = 2
+        writer.WriteMsg(response)
+    } else {
+        writer.WriteMsg(response)
+    }
+}
+
+func resolveDomain(m *dns.Msg) (*dns.Msg, error) {
 	client := new(dns.Client)
-    domain := "facebook.com."
 	destination := "198.41.0.4:53" //a.root-servers.net
-    var finalMessage **dns.Msg
-    var finalError *error
 
-	for finalMessage == nil  && finalError == nil {
-        message := newQuestion(domain)
-		in, _, err := client.Exchange(message, destination)
+	for true {
+		in, _, err := client.Exchange(m, destination)
 
-        if err != nil {
-            finalError = &err
-        } else if len(in.Answer) > 0 {
-            finalMessage = &in
+		if err != nil {
+			return nil, err
+		} else if len(in.Answer) > 0 {
+			return in, nil
 		} else {
 			if nsRecord, ok := in.Ns[0].(*dns.NS); ok {
 				destination = nsRecord.Ns + ":53"
@@ -27,20 +45,6 @@ func main() {
 		}
 	}
 
-    if finalError != nil {
-        fmt.Println(*finalError)
-    } else {
-        fmt.Println(*finalMessage)
-    }
+	return nil, fmt.Errorf("error resolving question %q", m.Question[0])
 }
 
-func newQuestion(domain string) *dns.Msg {
-	message := new(dns.Msg)
-	message.Id = dns.Id()
-	message.Question = make([]dns.Question, 1)
-	message.Question[0] = dns.Question{domain, dns.TypeA, dns.ClassINET}
-	message.RecursionDesired = true
-    message.SetEdns0(4096, false)
-
-    return message
-}
