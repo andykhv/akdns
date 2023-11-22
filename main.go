@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -11,14 +13,20 @@ import (
 )
 
 func main() {
-	log.Printf("Serving DNS queries @localhost:8053\n")
+	address := flag.String("a", "127.0.0.1:8053", "specify IPv4 address and port: <address>:<port>. default=127.0.0.1:8053")
+	useTls := flag.Bool("tls", false, "indicate to use TLS connection. default=udp")
+	flag.Parse()
+
+	log.Printf("Serving DNS queries at %s with TLS:%v\n", *address, *useTls)
+
 	handler := dns.HandlerFunc(handleDns)
-	server := serveDns("127.0.0.1:8053", "udp", handler)
+	server := serveDns(*address, *useTls, handler)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	s := <-sig
-	log.Printf("Signal (%s) received, stopping server...\n", s)
+
+	log.Printf("Signal %s received, stopping server...\n", s)
 	server.Shutdown()
 }
 
@@ -36,8 +44,21 @@ func handleDns(writer dns.ResponseWriter, m *dns.Msg) {
 	}
 }
 
-func serveDns(address, net string, handler dns.Handler) *dns.Server {
-	server := &dns.Server{Addr: address, Net: net, Handler: handler}
+func serveDns(address string, useTls bool, handler dns.Handler) *dns.Server {
+	var server *dns.Server
+
+	if useTls {
+		cert, err := tls.LoadX509KeyPair("./dns_server.pem", "./dns_server.key")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+
+		server = &dns.Server{Addr: address, Net: "tcp-tls", Handler: handler, TLSConfig: cfg}
+	} else {
+		server = &dns.Server{Addr: address, Net: "udp", Handler: handler}
+	}
+
 	go server.ListenAndServe()
 	return server
 }
