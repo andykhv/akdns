@@ -3,18 +3,26 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/miekg/dns"
 )
 
 func main() {
-	handler := dns.HandlerFunc(ServeDNS)
-	err := dns.ListenAndServe("127.0.0.1:8053", "udp", handler)
+	log.Printf("Serving DNS queries @localhost:8053\n")
+	handler := dns.HandlerFunc(handleDns)
+	server := serveDns("127.0.0.1:8053", "udp", handler)
 
-	log.Fatalln(err)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	s := <-sig
+	log.Printf("Signal (%s) received, stopping server...\n", s)
+	server.Shutdown()
 }
 
-func ServeDNS(writer dns.ResponseWriter, m *dns.Msg) {
+func handleDns(writer dns.ResponseWriter, m *dns.Msg) {
 	log.Println("Received Query:\n", m)
 	response, err := resolveDomain(m)
 
@@ -26,6 +34,12 @@ func ServeDNS(writer dns.ResponseWriter, m *dns.Msg) {
 	} else {
 		writer.WriteMsg(response)
 	}
+}
+
+func serveDns(address, net string, handler dns.Handler) *dns.Server {
+	server := &dns.Server{Addr: address, Net: net, Handler: handler}
+	go server.ListenAndServe()
+	return server
 }
 
 func resolveDomain(m *dns.Msg) (*dns.Msg, error) {
