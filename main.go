@@ -65,7 +65,7 @@ func serveDns(address string, useTls bool, handler dns.Handler) *dns.Server {
 
 func resolveDomain(m *dns.Msg) (*dns.Msg, error) {
 	client := new(dns.Client)
-	destination := "198.41.0.4:53" //a.root-servers.net
+	destination := GetRandomRootServer()
 
 	for true {
 		in, _, err := client.Exchange(m, destination)
