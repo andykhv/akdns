@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/miekg/dns"
 )
 
@@ -9,16 +11,15 @@ func main() {
 	handler := dns.HandlerFunc(ServeDNS)
 	err := dns.ListenAndServe("127.0.0.1:8053", "udp", handler)
 
-	if err != nil {
-		fmt.Println(err)
-	}
+	log.Fatalln(err)
 }
 
 func ServeDNS(writer dns.ResponseWriter, m *dns.Msg) {
+	log.Println("Received Query:\n", m)
 	response, err := resolveDomain(m)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		m.MsgHdr.Response = true
 		m.MsgHdr.Rcode = 2
 		writer.WriteMsg(response)
