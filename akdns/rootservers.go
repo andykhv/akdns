@@ -1,4 +1,4 @@
-package main
+package akdns
 
 import (
 	"math/rand"
@@ -23,7 +23,7 @@ var (
 	}
 )
 
-func GetRandomRootServer() string {
+func getRandomRootServer() string {
 	seed := time.Now().UnixNano()
 	r := rand.New(rand.NewSource(seed))
 	index := r.Intn(len(RootServersIPv4))
