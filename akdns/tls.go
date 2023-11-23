@@ -8,6 +8,11 @@ import (
 	"github.com/miekg/dns"
 )
 
+const (
+	CLOUDFLARE_DOT_SERVER = "1.1.1.1:853"
+	DOT_PORT              = ":853"
+)
+
 type TlsClient struct {
 	Config *tls.Config
 }
@@ -38,7 +43,7 @@ func (c *TlsClient) ServeDnsTls(address string, handler dns.Handler) (*dns.Serve
 }
 
 func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
-	destination := "1.1.1.1:853" //cloudflare DoT server
+	destination := CLOUDFLARE_DOT_SERVER
 
 	for true {
 		conn, err := dns.DialWithTLS("tcp-tls", destination, c.Config)
@@ -57,7 +62,7 @@ func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 			return response, nil
 		} else {
 			if nsRecord, ok := response.Ns[0].(*dns.NS); ok {
-				destination = nsRecord.Ns + ":853"
+				destination = nsRecord.Ns + DOT_PORT
 			}
 		}
 	}
