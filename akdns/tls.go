@@ -20,7 +20,7 @@ func (c *TlsClient) HandleDnsTls(writer dns.ResponseWriter, m *dns.Msg) {
 		log.Println(err)
 		m.MsgHdr.Response = true
 		m.MsgHdr.Rcode = 2
-		writer.WriteMsg(response)
+		writer.WriteMsg(m)
 	} else {
 		writer.WriteMsg(response)
 	}
@@ -38,7 +38,7 @@ func (c *TlsClient) ServeDnsTls(address string, handler dns.Handler) (*dns.Serve
 }
 
 func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
-	destination := getRandomRootServer() + ":853" //853 is designated DoT port
+	destination := "1.1.1.1:853" //cloudflare DoT server
 
 	for true {
 		conn, err := dns.DialWithTLS("tcp-tls", destination, c.Config)
