@@ -23,7 +23,7 @@ func HandleDnsUdp(writer dns.ResponseWriter, m *dns.Msg) {
 
 func resolveDomainUdp(m *dns.Msg) (*dns.Msg, error) {
 	client := new(dns.Client)
-	destination := getRandomRootServer()
+	destination := getRandomRootServer() + ":53"
 
 	for true {
 		in, _, err := client.Exchange(m, destination)

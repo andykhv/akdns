@@ -14,17 +14,21 @@ import (
 )
 
 func main() {
-	address := flag.String("a", "127.0.0.1:8053", "specify IPv4 address and port: <address>:<port>. default=127.0.0.1:8053")
-	useTls := flag.Bool("tls", false, "indicate to use TLS connection. default=udp")
+	address := flag.String("addr", "127.0.0.1:8053", "Specify IPv4 address and port: <address>:<port>. default=127.0.0.1:8053")
+	tlsAddress := flag.String("tls", "", "Indicate address for tcp. If nothing specified, a TLS port is not opened.")
 	flag.Parse()
 
-	log.Printf("Serving DNS queries at %s with TLS:%v\n", *address, *useTls)
-	var server *dns.Server
-
-	if !*useTls {
-		handler := dns.HandlerFunc(akdns.HandleDnsUdp)
-		server = akdns.ServeDnsUdp(*address, handler)
+	if *tlsAddress != "" {
+		log.Printf("Serving DNS queries at %s with TLS at %v\n", *address, *tlsAddress)
 	} else {
+		log.Printf("Serving DNS queries at %s\n", *address)
+	}
+	var tlsServer *dns.Server
+
+	handler := dns.HandlerFunc(akdns.HandleDnsUdp)
+	udpServer := akdns.ServeDnsUdp(*address, handler)
+
+	if *tlsAddress != "" {
 		config, err := loadTlsConfig("./dns_server.pem", "./dns_server.key")
 		if err != nil {
 			log.Fatalln(err)
@@ -35,7 +39,7 @@ func main() {
 		}
 
 		handler := dns.HandlerFunc(tlsClient.HandleDnsTls)
-		server, err = tlsClient.ServeDnsTls(*address, handler)
+		tlsServer, err = tlsClient.ServeDnsTls(*tlsAddress, handler)
 
 		if err != nil {
 			log.Fatalln(err)
@@ -47,7 +51,14 @@ func main() {
 	s := <-sig
 
 	log.Printf("Signal %s received, stopping server...\n", s)
-	server.Shutdown()
+
+	udpServer.Shutdown()
+
+	if *tlsAddress != "" {
+		tlsServer.Shutdown()
+	}
+
+	log.Printf("Done!\n")
 }
 
 func loadTlsConfig(publicKey, privateKey string) (*tls.Config, error) {
