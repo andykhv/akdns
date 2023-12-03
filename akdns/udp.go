@@ -1,7 +1,6 @@
 package akdns
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/miekg/dns"
@@ -25,7 +24,7 @@ func resolveDomainUdp(m *dns.Msg) (*dns.Msg, error) {
 	client := new(dns.Client)
 	destination := getRandomRootServer() + ":53"
 
-	for true {
+	for {
 		in, _, err := client.Exchange(m, destination)
 
 		if err != nil {
@@ -39,7 +38,6 @@ func resolveDomainUdp(m *dns.Msg) (*dns.Msg, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("error resolving question %q", m.Question[0])
 }
 
 func ServeDnsUdp(address string, handler dns.Handler) *dns.Server {
