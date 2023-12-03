@@ -46,7 +46,7 @@ func (c *TlsClient) ServeDnsTls(address string, handler dns.Handler) (*dns.Serve
 func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 	destination := CLOUDFLARE_DOT_SERVER
 
-	for true {
+	for {
 		conn, err := c.getConnection(destination)
 
 		if err != nil {
@@ -66,8 +66,6 @@ func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 			}
 		}
 	}
-
-	return nil, fmt.Errorf("error resolving question %q", m.Question[0])
 }
 
 func (c *TlsClient) getConnection(address string) (*dns.Conn, error) {
