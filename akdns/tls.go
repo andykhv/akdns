@@ -15,10 +15,11 @@ const (
 
 type TlsClient struct {
 	Config *tls.Config
+	Pool   map[string]*dns.Conn
 }
 
 func (c *TlsClient) HandleDnsTls(writer dns.ResponseWriter, m *dns.Msg) {
-	log.Println("Received Query:\n", m)
+	log.Printf("Received Query:\n%v\n", m)
 	response, err := c.resolveDomainTls(m)
 
 	if err != nil {
@@ -46,13 +47,12 @@ func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 	destination := CLOUDFLARE_DOT_SERVER
 
 	for true {
-		conn, err := dns.DialWithTLS("tcp-tls", destination, c.Config)
+		conn, err := c.getConnection(destination)
 
 		if err != nil {
 			return nil, fmt.Errorf("%v", err)
 		}
 
-		defer conn.Close()
 		conn.WriteMsg(m)
 		response, err := conn.ReadMsg()
 
@@ -68,4 +68,39 @@ func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 	}
 
 	return nil, fmt.Errorf("error resolving question %q", m.Question[0])
+}
+
+func (c *TlsClient) getConnection(address string) (*dns.Conn, error) {
+	conn, found := c.Pool[address]
+
+	if found {
+		_, err := conn.Read(make([]byte, 0, 1))
+
+		if err != dns.ErrConnEmpty {
+			return conn, nil
+		}
+	}
+
+	conn, err := dns.DialWithTLS("tcp-tls", address, c.Config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	c.Pool[address] = conn
+	return conn, nil
+}
+
+func (c *TlsClient) CloseConnectionPools() []error {
+	errs := make([]error, 0, 10)
+
+	for _, conn := range c.Pool {
+		err := conn.Close()
+
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
 }

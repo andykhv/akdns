@@ -23,42 +23,43 @@ func main() {
 	} else {
 		log.Printf("Serving DNS queries at %s\n", *address)
 	}
-	var tlsServer *dns.Server
 
+	var tlsServer *dns.Server
+	var tlsClient *akdns.TlsClient
 	handler := dns.HandlerFunc(akdns.HandleDnsUdp)
 	udpServer := akdns.ServeDnsUdp(*address, handler)
 
 	if *tlsAddress != "" {
-		config, err := loadTlsConfig("./dns_server.pem", "./dns_server.key")
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		tlsClient := akdns.TlsClient{
-			Config: config,
-		}
-
-		handler := dns.HandlerFunc(tlsClient.HandleDnsTls)
-		tlsServer, err = tlsClient.ServeDnsTls(*tlsAddress, handler)
+		var err error
+		tlsServer, tlsClient, err = serverDnsTls(*tlsAddress)
 
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatalf("%v\n", err)
 		}
 	}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	s := <-sig
+	handleShutdown(udpServer, tlsServer, tlsClient)
+}
 
-	log.Printf("Signal %s received, stopping server...\n", s)
-
-	udpServer.Shutdown()
-
-	if *tlsAddress != "" {
-		tlsServer.Shutdown()
+func serverDnsTls(address string) (*dns.Server, *akdns.TlsClient, error) {
+	config, err := loadTlsConfig("./dns_server.pem", "./dns_server.key")
+	if err != nil {
+		return nil, nil, err
 	}
 
-	log.Printf("Done!\n")
+	tlsClient := akdns.TlsClient{
+		Config: config,
+		Pool:   make(map[string]*dns.Conn),
+	}
+
+	handler := dns.HandlerFunc(tlsClient.HandleDnsTls)
+	tlsServer, err := tlsClient.ServeDnsTls(address, handler)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return tlsServer, &tlsClient, nil
 }
 
 func loadTlsConfig(publicKey, privateKey string) (*tls.Config, error) {
@@ -70,4 +71,27 @@ func loadTlsConfig(publicKey, privateKey string) (*tls.Config, error) {
 	config := &tls.Config{Certificates: []tls.Certificate{cert}}
 
 	return config, nil
+}
+
+func handleShutdown(udpServer, tlsServer *dns.Server, tlsClient *akdns.TlsClient) {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	s := <-sig
+
+	log.Printf("Signal %s received, stopping server...\n", s)
+
+	udpServer.Shutdown()
+
+	if tlsServer != nil {
+		tlsServer.Shutdown()
+		errors := tlsClient.CloseConnectionPools()
+
+		if len(errors) > 0 {
+			for _, err := range errors {
+				log.Printf("%v\n", err)
+			}
+		}
+	}
+
+	log.Printf("Done!\n")
 }
