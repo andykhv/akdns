@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -66,7 +67,10 @@ func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 		if err != nil {
 			return nil, err
 		} else if len(response.Answer) > 0 {
-			c.Cache.StoreRecord(RecordKey{m.Question[0].Name, m.Question[0].Qtype, m.Question[0].Qclass}, response.Answer)
+			recordKey := RecordKey{m.Question[0].Name, m.Question[0].Qtype, m.Question[0].Qclass}
+			ttl := int64(response.Answer[0].Header().Ttl)
+			var second int64 = 1000000000
+			c.Cache.StoreRecord(recordKey, response.Answer, time.Duration(ttl*second))
 			return response, nil
 		} else {
 			if nsRecord, ok := response.Ns[0].(*dns.NS); ok {
@@ -82,7 +86,7 @@ func (c *TlsClient) getConnection(address string) (*dns.Conn, error) {
 	if found {
 		_, err := conn.Read(make([]byte, 0, 1))
 
-		if err != dns.ErrConnEmpty {
+		if err == nil {
 			return conn, nil
 		}
 	}
