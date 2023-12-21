@@ -16,6 +16,7 @@ const (
 type TlsClient struct {
 	Config *tls.Config
 	Pool   map[string]*dns.Conn
+	Cache  *RecordCache
 }
 
 func (c *TlsClient) HandleDnsTls(writer dns.ResponseWriter, m *dns.Msg) {
@@ -46,6 +47,12 @@ func (c *TlsClient) ServeDnsTls(address string, handler dns.Handler) (*dns.Serve
 func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 	destination := CLOUDFLARE_DOT_SERVER
 
+	if records, found := c.Cache.LoadRecord(RecordKey{m.Question[0].Name, m.Question[0].Qtype, m.Question[0].Qclass}); found {
+		m.Answer = records
+		m.MsgHdr.Response = true
+		return m, nil
+	}
+
 	for {
 		conn, err := c.getConnection(destination)
 
@@ -59,6 +66,7 @@ func (c *TlsClient) resolveDomainTls(m *dns.Msg) (*dns.Msg, error) {
 		if err != nil {
 			return nil, err
 		} else if len(response.Answer) > 0 {
+			c.Cache.StoreRecord(RecordKey{m.Question[0].Name, m.Question[0].Qtype, m.Question[0].Qclass}, response.Answer)
 			return response, nil
 		} else {
 			if nsRecord, ok := response.Ns[0].(*dns.NS); ok {

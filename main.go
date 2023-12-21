@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/andykhv/akdns/akdns"
@@ -50,6 +51,7 @@ func serverDnsTls(address string) (*dns.Server, *akdns.TlsClient, error) {
 	tlsClient := akdns.TlsClient{
 		Config: config,
 		Pool:   make(map[string]*dns.Conn),
+		Cache:  &akdns.RecordCache{Cache: &sync.Map{}},
 	}
 
 	handler := dns.HandlerFunc(tlsClient.HandleDnsTls)
